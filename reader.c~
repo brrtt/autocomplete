@@ -1,0 +1,21 @@
+#include <stdio.h>
+#include <stdlib.h> // malloc & free
+
+int main(int argc, char * argv[])
+{
+  char *str;
+  FILE * f = fopen(argv[1],"r");
+  if (f==NULL)
+    {
+      printf("File does not exist.\n");
+      return 0;
+    }
+  
+  //char * array = malloc(1000);
+  //int size = 1000;
+  //int i=0;
+  int n=60;
+
+  fgets(str,n,f);
+  printf("%s",str);
+}

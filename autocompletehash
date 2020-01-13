@@ -1,0 +1,227 @@
+#include "autocomplete.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+const int size=100000;
+
+typedef int Key;
+typedef char * Item;
+
+struct hashNode
+{
+  Key key;
+  Item word;
+  struct hashNode *next;
+  struct hashNode *prior;
+};
+
+typedef struct hashNode HashNode;
+HashNode * hashTable[size];
+
+Key hash(const char * word)
+{
+  Key hashKey=0;
+  int i;
+  int prime=37; 
+  // int wordLength=strlen(word);
+  
+  for(i=0;i<2;i++)
+    {
+      prime*=prime;
+      hashKey+=word[i]*prime;
+    }
+  hashKey%=size;
+  Key index=hashKey;
+  return index; 
+}
+
+int HTfind(Key index,const char * word)
+{
+  HashNode * head=hashTable[index];
+  int checks=0;
+
+  while(head)
+    {
+      checks++;
+      if(strcmp(head->word,word)==0)
+	  return 1;
+      head=head->next;
+    }
+  return 0;
+}
+
+int HTcollide(Key index)
+{
+  HashNode*head=hashTable[index];
+  int checks=0;
+ 
+  while(head)
+    {
+      checks++;
+      if(head->key==index)
+	return 1;
+      head=head->next;
+    }
+  return 0;
+}
+  
+
+void HTadd(const char * word) //builds new node
+{
+  Key index=hash(word);
+  if(!HTfind(index,word))
+    {
+      HashNode *new=malloc(sizeof(HashNode));
+      new->key=index;
+      new->word=word;
+      new->next=NULL;
+      new->prior=NULL; 
+      hashTable[index]=new;
+    }
+}
+
+
+
+
+// Add a word to the autocomplete dictionary.  If the word is already 
+// present, it simply does nothing.
+void AutoComplete_AddWord(const char *word)
+{
+  char *trim=malloc(1);
+  if((trim=strchr(word,'\n')) != NULL)
+    *trim='\0';
+  HTadd(word);
+}
+
+
+// Add the words in file specified by filename to the
+// auto-complete engine. This may be called multiple
+// times with different filenames.  The words in the new
+// file are appended to the existing list.  Duplicates are not 
+// allowed.
+// Argument: filename - file with words that need to be added
+//                      to the table
+// Return value: 0: success
+//               1: bad file name
+int AutoComplete_LoadDictionary(const char *filename)
+{
+  FILE * f = fopen(filename,"r");
+  if(f==NULL)
+    {
+      printf("File does not exist.\n");
+      return 1;
+    }
+  char *word=malloc(sizeof(60)); 
+  int n=60;
+  
+  while( NULL != fgets(word,n,f)) //begin reading words into hash table
+    AutoComplete_AddWord(word);
+  
+
+  
+ return 0;
+}
+
+// Add the words in file specified by filename to the
+// auto-complete engine. This may be called multiple
+// times with different filenames.  The words in the new
+// file are appended to the existing list.  Duplicates are not 
+// allowed.
+// Argument: filename - file with words that need to be added
+//                      to the table
+// Return value: 0: success
+//               1: bad file name
+
+
+
+// Add context for a word to the autocomplete dictionary.  If the word
+// is not already present, then add it. If the word is present, add 
+// prior to its context. If prior is already present, do not add it at all
+void AutoComplete_AddContext(const char *word, const char * prior)
+{
+  int index=hash(word);
+  int pendex=hash(prior);
+  if(HTfind(index,word) && !HTfind(pendex,prior))
+    {
+      HashNode *new=malloc(sizeof(HashNode));
+      new->key=index;
+      new->word=word;
+      new->prior=hashTable[pendex];
+      hashTable[index]=new;
+    }
+  else
+     AutoComplete_AddWord(word);
+  
+		      
+}
+
+
+
+
+// Return an integer specifying the total amount of memory
+// used by the auto-completer.
+// Arguments: None
+// Return value: integer that specifies in bytes the amount
+//               of memory used, including global/static variables.
+int AutoComplete_TotalMemoryUsed()
+{
+  return 0;
+}
+
+// Return an integer specifying the total number of words
+// added to the auto-completer.
+int AutoComplete_NumberOfDictionaryWords()
+{
+  return 0;
+}
+
+// Return an integer specifying the total number of words
+// used for semantic context.
+int AutoComplete_NumberOfContextWords()
+{
+  return 0;
+}
+
+// For a given partial word, return no more than size possible
+// completions.
+// Arguments: prompt - the beginning of a word to complete
+//            prior -  a string with the word that came before it; it 
+//                     may be NULL, and if so, no context is needed 
+//                     for a match. Otherwise, the prior must be part 
+//                     of the context of all returned words.
+//            completions - an array to store the completions inside
+//            size_of_array - size of the completions array
+//
+// Return value: number of completions returned in the array; 0 means
+//               nothing was returned
+//
+int AutoComplete_Suggestion(const char *partial_word, const char *prior, const char *completions[], int size_of_array)
+{
+  int matches=0;
+  Key index=hash(partial_word);
+  HashNode *head=hashTable[index];
+  int comparisons=0;
+  
+  while(head)
+    {
+      comparisons++;
+      if(head->key==index)
+	{
+	 HashNode *  p=head->prior;
+	 while(p!=NULL)
+	   {
+	     if(p->word==prior)
+	       {
+		 completions[matches]=p->word;
+		 matches++;
+	       }
+	     p=p->prior;
+	   }
+	}
+      head=head->next;
+    }
+  
+  return 0;
+}
+

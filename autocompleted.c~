@@ -1,0 +1,233 @@
+// Author: Andre Rucker
+//
+//   This is a simple autocomplete program that will read in context clues of a sentence and the 
+// first part of a word and try to find the most suitable word to fill in.
+
+#include "autocomplete.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int x=0;
+struct word_list{
+  char word[100];
+  struct word_list* next;
+  struct word_list* prior;
+};
+struct word_list* head = NULL;
+int numberOfWords = 0;
+int numberOfContext = 0;
+
+// Add the words in file specified by filename to the
+// auto-complete engine. This may be called multiple
+// times with different filenames.  The words in the new
+// file are appended to the existing list.  Duplicates are not 
+// allowed.
+// Argument: filename - file with words that need to be added
+//                      to the table
+// Return value: 0: success
+//               1: bad file name
+
+
+int AutoComplete_LoadDictionary(const char *filename){
+  FILE* fp;
+  char* wordtmp = malloc(sizeof(char)*60);
+
+  fp=fopen(filename,"r");
+
+// check if its a bad file name
+  if(fp == NULL){
+    return 1;
+  }
+
+// adds words to dictionary
+  else{
+    while(fscanf(fp, "%s", wordtmp) != EOF){
+      AutoComplete_AddWord(wordtmp);
+    }
+  }
+  fclose(fp);
+  printf("hello dictionary\n");
+  return 0;
+}
+
+// Add a word to the autocomplete dictionary.  If the word is already 
+// present, it simply does nothing.
+void AutoComplete_AddWord(const char *word){
+  struct word_list* tmp = NULL;
+  struct word_list* prev = NULL;
+  struct word_list* newWord = (struct word_list*) malloc(sizeof(struct word_list));
+  
+  strcpy(newWord->word, word);
+  tmp = head;
+  prev = head;
+
+// if this is the first word
+  if(head == NULL){
+    head = newWord;
+    newWord->next = NULL;
+    newWord->prior = NULL;
+  }
+  else{
+    while(tmp != NULL && strcmp(tmp->word, word) < 0){
+      prev = tmp;
+      tmp = tmp->next;
+    }
+
+// test if the word is already present 
+    if(tmp != NULL && strcmp(tmp->word, word) == 0){
+      free(newWord);
+      return;
+    }
+
+// test if the word is at the front of the list
+    if(prev == tmp){
+      newWord->next = head;
+      head = newWord;
+      newWord->prior = NULL;
+    }
+
+// test if word is in middle of list
+    else{
+      newWord->next = tmp;
+      prev->next = newWord;
+      newWord->prior = NULL;
+    }
+  }
+  
+  tmp = head;
+  /*while(tmp != NULL){
+    printf("%s exist in dictionary\n", tmp->word);
+    tmp = tmp->next;
+  }*/
+  numberOfWords++;
+}
+
+
+// Add context for a word to the autocomplete dictionary.  If the word
+// is not already present, then add it. If the word is present, add 
+// prior to its context. If prior is already present, do not add it a 
+// second time.
+void AutoComplete_AddContext(const char *word, const char * prior){
+  struct word_list* tmp = NULL;
+  struct word_list* ptmp = NULL;
+  struct word_list* newWord = (struct word_list*) malloc(sizeof(struct word_list));
+  
+  strcpy(newWord->word, word);
+  tmp = head;
+  newWord->next = NULL;
+
+  while(tmp != NULL && strcmp(tmp->word, word) != 0){
+    tmp = tmp->next;
+    }
+
+// test if word doesn't exist
+  if(tmp == NULL){
+    AutoComplete_AddWord(word);
+    tmp = head;
+    while(tmp != NULL && strcmp(tmp->word, word) != 0){
+      tmp = tmp->next;
+    }
+  }
+  ptmp = tmp;
+  while(ptmp->prior != NULL){
+    ptmp = ptmp->prior;
+    ptmp->next = NULL;
+  }
+  
+  ptmp->prior = newWord;
+  newWord->prior = NULL;
+  numberOfContext++;
+}
+
+
+// Return an integer specifying the total amount of memory
+// used by the auto-completer.
+// Arguments: None
+// Return value: integer that specifies in bytes the amount
+//               of memory used, including global/static variables.
+int AutoComplete_TotalMemoryUsed(){
+  int total_mem=0;
+  total_mem += numberOfWords * sizeof(struct word_list);
+  total_mem += numberOfContext * sizeof(struct word_list);
+  printf("\nhello total_mem\n");
+  return total_mem;
+}
+
+// Return an integer specifying the total number of words
+// added to the auto-completer.
+int AutoComplete_NumberOfDictionaryWords(){
+  printf("\nhello dicwords\n");
+  return numberOfWords;
+}
+
+// Return an integer specifying the total number of words
+// used for semantic context.
+int AutoComplete_NumberOfContextWords(){
+  printf("\nhello conwords\n");
+  return numberOfContext;
+}
+
+// For a given partial word, return no more than size possible
+// completions.
+// Arguments: prompt - the beginning of a word to complete
+//            prior -  a string with the word that came before it; it 
+//                     may be NULL, and if so, no context is needed 
+//                     for a match. Otherwise, the prior must be part 
+//                     of the context of all returned words.
+//            completions - an array to store the completions inside
+//            size_of_array - size of the completions array
+//
+// Return value: number of completions returned in the array; 0 means
+//               nothing was returned
+//
+int AutoComplete_Suggestion(const char *partial_word, const char *prior, const char *completions[], int size_of_array){
+  int matches = 0;
+  int partial = 0;
+  struct word_list* tmp = NULL;
+  struct word_list* prev = NULL;
+
+  partial = strlen(partial_word);
+  
+  tmp = head;
+
+// matches with prior
+  if(prior != NULL){
+    while(matches < size_of_array && tmp != NULL){
+      prev = tmp;
+      if(strncmp(tmp->word, partial_word, partial) == 0){
+	while(tmp->prior != NULL){
+	  if(strcmp(tmp->prior->word, prior) == 0){
+             completions[matches] = tmp->word;
+	     matches+=1;
+	  }
+	  tmp = tmp->prior;
+	}
+      }
+      tmp = prev->next;
+    }
+  }
+// matches without prior
+  tmp = head;
+  if(matches == 0){
+    while(matches < size_of_array && tmp != NULL){
+      prev = tmp;
+      if(strncmp(tmp->word, partial_word, partial) == 0){
+             completions[matches] = tmp->word;
+	     matches+=1;
+      }
+      tmp = prev->next;
+    }
+  }
+  printf("matches = %d\n", matches);
+  return matches;
+}
+
+
+
+
+
+
+
+
+
